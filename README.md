@@ -4,8 +4,6 @@ A lightweight, browser-based utility for calculating and optimizing character bu
 🚀 Key Features
  - DPS & Sustain Modeling: Calculates raw damage output and recovery rates using game-accurate formulas.
 
- - Gap Analysis: Identifies which stats are missing from your current gear to suggest the best Pet substats.
-
  - Weakest Link Detection: Quickly find the lowest-performing piece of gear or pet in your current setup.
 
  - Baseline Comparison: Save your current stats to see real-time percentage gains or losses when testing new items.
