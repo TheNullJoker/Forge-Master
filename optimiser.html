@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forge Optimizer v52</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: white; padding-bottom: 240px; font-family: sans-serif; overflow-x: hidden; }
+        .card { background-color: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 14px; margin-bottom: 12px; transition: all 0.3s; position: relative; }
+        .pet-card { background-color: #162033; border-style: dashed; }
+        .weakest-link { border: 2px solid #f87171 !important; box-shadow: 0 0 15px rgba(248, 113, 113, 0.4); }
+        #back-to-top { display: none; position: fixed; bottom: 100px; right: 20px; z-index: 1500; background-color: #38bdf8; color: white; width: 50px; height: 50px; border-radius: 50%; font-size: 20px; cursor: pointer; border: none; box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4); }
+        .impact-badge { position: absolute; top: -8px; left: 12px; font-size: 9px; padding: 2px 8px; border-radius: 4px; font-weight: bold; background: #38bdf8; color: white; display: none; z-index: 10; border: 1px solid #0ea5e9; }
+        .item-title { color: #38bdf8; font-weight: 800; font-size: 13px; text-transform: uppercase; }
+        label { display: block; font-size: 10px; color: #94a3b8; font-weight: bold; margin-bottom: 3px; text-transform: uppercase; }
+        input, select { width: 100% !important; background-color: #ffffff !important; color: #000000 !important; border: 2px solid #38bdf8 !important; border-radius: 6px !important; padding: 10px !important; font-size: 16px !important; font-weight: 800 !important; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .footer { position: fixed; bottom: 0; left: 0; right: 0; background-color: #0f172a; border-top: 4px solid #38bdf8; padding: 15px; z-index: 1000; }
+        .btn-action { @apply text-[9px] font-bold py-2 px-2 rounded transition-all active:scale-95 text-white uppercase; }
+        .btn-restore { @apply text-[8px] bg-slate-600 px-2 py-1 rounded hover:bg-slate-500 transition-colors font-bold text-white uppercase; }
+        .stat-row { display: flex; justify-content: space-between; border-bottom: 1px solid #334155; padding: 4px 0; font-size: 12px; }
+        #guide-modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.9); width: 90%; max-width: 450px; max-height: 80vh; background: #1e293b; border: 2px solid #38bdf8; border-radius: 20px; z-index: 3000; padding: 24px; overflow-y: auto; opacity: 0; pointer-events: none; transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        #guide-modal.active { opacity: 1; pointer-events: auto; transform: translate(-50%, -50%) scale(1); }
+        #modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2500; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+        #modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .switch { position: relative; display: inline-block; width: 40px; height: 20px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #334155; transition: .4s; border-radius: 20px; }
+        .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+        input:checked + .slider { background-color: #38bdf8; }
+        input:checked + .slider:before { transform: translateX(20px); }
+    </style>
+</head>
+<body>
+
+    <button id="back-to-top" onclick="scrollToTop()">🔝</button>
+
+    <div id="modal-overlay" onclick="toggleGuide()"></div>
+    <div id="guide-modal">
+        <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-3">
+            <h2 class="text-xl font-black italic text-white underline decoration-sky-400">USER GUIDE</h2>
+            <button onclick="toggleGuide()" class="text-red-400 font-bold text-sm">CLOSE</button>
+        </div>
+        <div class="mb-4 text-slate-300 text-[12px] space-y-4 text-left">
+            <p><b class="text-sky-400">⚔️ Offense Score:</b> Your constant damage per second. Crit Damage and Double Chance are factored in as average multipliers.</p>
+            <p><b class="text-sky-400">🛡️ Recovery Rate (Sustain):</b> Percentage of your total health bar recovered per second via Regen and Lifesteal. <b>Block</b> acts as a long-term efficiency multiplier here.</p>
+            <p><b class="text-sky-400">🛡️ One-Shot Limit:</b> Your raw Max HP. This is the only guaranteed safety margin against fatal hits, as Block is probability-based.</p>
+            <p><b class="text-sky-400">📍 Baseline & Restore:</b> Click <b>Set Baseline</b> to save your current build. After testing new items, click <b>Restore</b> on any slot to revert to those stats.</p>
+            <p><b class="text-sky-400">📊 Weakest Link:</b> This tool calculates which item has the lowest combined contribution to your Offense and Survival scores.</p>
+        </div>
+        <div class="text-center pt-2">
+            <button onclick="toggleGuide()" class="bg-sky-500 text-white font-black py-2 px-8 rounded-full text-xs uppercase tracking-widest">Understood</button>
+        </div>
+    </div>
+
+    <div class="p-4">
+        <div class="flex flex-col mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h1 class="text-2xl font-black italic text-white">FORGE <span class="text-sky-400">MASTER</span></h1>
+                    <p class="text-[10px] text-sky-500 font-bold tracking-widest uppercase">Optimizer V52</p>
+                </div>
+                <button onclick="toggleGuide()" class="bg-slate-700 text-white text-[9px] font-black px-4 py-2 rounded-full border border-slate-600 uppercase">Guide</button>
+            </div>
+            
+            <div class="card mb-4 border-slate-700 bg-slate-800/50 flex justify-between items-center">
+                <label class="text-sky-300 !mb-0 text-[9px]">Impact Mode: <span id="mode-text" class="text-white">Normalized (Pie)</span></label>
+                <label class="switch">
+                    <input type="checkbox" id="impact-mode" onchange="updateModeText()">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mb-2">
+                <button onclick="exportBuild()" class="btn-action bg-purple-600">Export</button>
+                <button onclick="importBuild()" class="btn-action bg-emerald-600">Import</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mb-2">
+                <button onclick="saveToStorage()" class="btn-action bg-blue-600">Save Browser</button>
+                <button onclick="resetBaseline()" class="btn-action bg-slate-600">Set Baseline</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="findWeakest('item')" class="btn-action bg-red-500">Weakest Item</button>
+                <button onclick="findWeakest('pet')" class="btn-action bg-red-700">Weakest Pet</button>
+            </div>
+        </div>
+
+        <div id="stat-summary" class="card stat-summary-card hidden"><div class="item-title text-white">Total Stats</div><div id="stat-list"></div></div>
+
+        <div class="card" id="card-mount">
+            <div class="impact-badge" id="impact-mount">--</div>
+            <div class="flex justify-between items-center mb-2"><span class="item-title">Mount Bonuses</span><button onclick="restoreMount()" class="btn-restore">RESTORE</button></div>
+            <div class="grid-2">
+                <div><label>Mount DMG %</label><input type="number" id="mount-dmg" step="any" value="0"></div>
+                <div><label>Mount HP %</label><input type="number" id="mount-hp" step="any" value="0"></div>
+            </div>
+            <div class="grid-2 mb-2"><select id="mount-sub1" class="sub-sel"><option value="">None</option></select><input type="number" id="mount-val1" step="any" placeholder="0"></div>
+            <div class="grid-2"><select id="mount-sub2" class="sub-sel"><option value="">None</option></select><input type="number" id="mount-val2" step="any" placeholder="0"></div>
+        </div>
+
+        <div id="items-container"></div>
+        <div class="mt-8 mb-4 border-b border-sky-900 pb-2"><h2 class="text-sky-400 font-black text-sm uppercase tracking-widest italic text-center">Pet Companions</h2></div>
+        <div id="pets-container"></div>
+    </div>
+
+    <div class="footer text-center">
+        <div class="grid grid-cols-3 gap-1 px-2">
+            <div class="border-r border-slate-700">
+                <div class="text-[8px] text-slate-400 font-black uppercase">Offense</div>
+                <div id="dps-score" class="text-[12px] font-black">0</div>
+                <div id="dps-diff" class="text-[9px] font-bold text-slate-500">--</div>
+            </div>
+            <div class="border-r border-slate-700">
+                <div class="text-[8px] text-slate-400 font-black uppercase">Rec/Sec</div>
+                <div id="sustain-score" class="text-[12px] font-black text-emerald-400">0%</div>
+                <div id="sustain-diff" class="text-[9px] font-bold text-slate-500">--</div>
+            </div>
+            <div>
+                <div class="text-[8px] text-slate-400 font-black uppercase">One-Shot</div>
+                <div id="ehp-score" class="text-[12px] font-black text-sky-400">0</div>
+                <div id="ehp-diff" class="text-[9px] font-bold text-slate-500">--</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const stats = ["Crit Chance", "Crit Damage", "Attack Speed", "Double Chance", "Damage", "Skill Damage", "Ranged Damage", "Melee Damage", "Block", "Lifesteal", "Regen", "Skill Cooldown", "Health"];
+        const itemNames = ["Helmet", "Chest", "Gloves", "Boots", "Weapon", "Belt", "Necklace", "Ring"];
+        const petNames = ["Pet 1", "Pet 2", "Pet 3"];
+        let bDPS = 0, bSUS = 0, bEHP = 0, baselineData = {}, mountBaseline = {};
+
+        function init() {
+            const iCont = document.getElementById('items-container'), pCont = document.getElementById('pets-container');
+            const ms1 = document.getElementById('mount-sub1'), ms2 = document.getElementById('mount-sub2');
+            stats.forEach(st => { ms1.add(new Option(st, st)); ms2.add(new Option(st, st)); });
+            itemNames.forEach((name, i) => createCard(name, i, iCont, false));
+            petNames.forEach((name, i) => createCard(name, i + 8, pCont, true));
+            document.querySelectorAll('input, select').forEach(el => el.addEventListener('input', () => calculate()));
+            loadFromStorage();
+        }
+
+        function createCard(name, i, container, isPet) {
+            const div = document.createElement('div'); div.className = `card ${isPet ? 'pet-card' : ''}`; div.id = `card-item-${i}`;
+            let extra = name === "Weapon" ? `<div class="mb-4"><label>Weapon Type</label><select id="weapon-type" class="bg-sky-100 font-black"><option value="Melee">MELEE</option><option value="Ranged">RANGED</option></select></div>` : "";
+            div.innerHTML = `<div class="impact-badge" id="impact-${i}">--</div>
+                <div class="flex justify-between items-center mb-2"><span class="item-title">${name}</span><button onclick="restoreItem(${i})" class="btn-restore">RESTORE</button></div>
+                ${extra}<div class="grid-2"><div><label>Flat DMG</label><input type="number" id="dmg-${i}" step="any" value="0"></div><div><label>Flat HP</label><input type="number" id="hp-${i}" step="any" value="0"></div></div>
+                <div class="grid-2 mb-2"><select id="sub1-${i}" class="sub-sel"><option value="">None</option></select><input type="number" id="val1-${i}" step="any" placeholder="0"></div>
+                <div class="grid-2"><select id="sub2-${i}" class="sub-sel"><option value="">None</option></select><input type="number" id="val2-${i}" step="any" placeholder="0"></div>`;
+            container.appendChild(div);
+            const s1 = document.getElementById(`sub1-${i}`), s2 = document.getElementById(`sub2-${i}`);
+            stats.forEach(st => { s1.add(new Option(st, st)); s2.add(new Option(st, st)); });
+        }
+
+        function calculate(silent = false) {
+            let t = { DMG: 0, HP: 0 }; stats.forEach(s => t[s] = 0);
+            let mDmgPct = parseFloat(document.getElementById('mount-dmg').value) || 0;
+            let mHpPct = parseFloat(document.getElementById('mount-hp').value) || 0;
+            let wType = document.getElementById('weapon-type')?.value || "Melee";
+            document.querySelectorAll('.sub-sel').forEach(s => { const v = document.getElementById(s.id.replace('sub', 'val')); if (s.value && v) t[s.value] += parseFloat(v.value) || 0; });
+            for (let i = 0; i < 11; i++) { t.DMG += parseFloat(document.getElementById(`dmg-${i}`).value) || 0; t.HP += parseFloat(document.getElementById(`hp-${i}`).value) || 0; }
+            let fC = Math.min(t["Crit Chance"], 100), fD = Math.min(t["Double Chance"], 100), fB = Math.min(t["Block"], 95);
+            let totalDmgMult = 1 + (mDmgPct + t.Damage + (wType === "Melee" ? t["Melee Damage"] : t["Ranged Damage"])) / 100;
+            let totalHpMult = 1 + (mHpPct + t.Health) / 100;
+            let rawMaxHP = t.HP * totalHpMult;
+            let dps = (t.DMG * totalDmgMult) * (1 + (fC / 100 * (0.2 + t["Crit Damage"] / 100))) * (1 + fD/100) * ((1 / 1.7) * (1 + t["Attack Speed"] / 100));
+            let healing = (rawMaxHP * (t.Regen / 100)) + (dps * (t.Lifesteal / 100));
+            let recoveryRate = rawMaxHP > 0 ? (healing / (1 - (fB/100))) / rawMaxHP * 100 : 0;
+            let tankLimit = healing / (1 - (fB/100));
+            if(!silent) {
+                renderStatSummary(t);
+                document.getElementById('dps-score').textContent = Math.round(dps).toLocaleString();
+                document.getElementById('sustain-score').textContent = recoveryRate.toFixed(1) + "%";
+                document.getElementById('ehp-score').textContent = Math.round(rawMaxHP).toLocaleString();
+                showDiff('dps-diff', dps, bDPS); showDiff('sustain-diff', recoveryRate, bSUS); showDiff('ehp-diff', rawMaxHP, bEHP);
+            }
+            return { dps, tankLimit, rec: recoveryRate, rawMaxHP };
+        }
+
+        function findWeakest(type) {
+            const base = calculate(true); let rawImpacts = []; let totalLoss = 0;
+            const isLossMode = document.getElementById('impact-mode').checked;
+            document.querySelectorAll('.card').forEach(c => c.classList.remove('weakest-link'));
+            const list = type === 'item' ? ['mount', 0, 1, 2, 3, 4, 5, 6, 7] : [8, 9, 10];
+            list.forEach(id => {
+                let backup = {}; const f = id === "mount" ? ['mount-dmg', 'mount-hp', 'mount-sub1', 'mount-val1', 'mount-sub2', 'mount-val2'] : [`dmg-${id}`, `hp-${id}`, `sub1-${id}`, `val1-${id}`, `sub2-${id}`, `val2-${id}`];
+                f.forEach(k => { backup[k] = document.getElementById(k).value; if(k.includes('sub')) document.getElementById(k).value = ""; else document.getElementById(k).value = 0; });
+                let t = calculate(true); f.forEach(k => document.getElementById(k).value = backup[k]);
+                let loss = (base.dps + base.tankLimit + base.rawMaxHP) - (t.dps + t.tankLimit + t.rawMaxHP);
+                rawImpacts.push({ id, loss: Math.max(0, loss) }); totalLoss += Math.max(0, loss);
+            });
+            rawImpacts.forEach(item => {
+                let val = isLossMode ? (item.loss / (base.dps + base.tankLimit + base.rawMaxHP)) * 100 : (totalLoss > 0 ? (item.loss / totalLoss) * 100 : 0);
+                const b = document.getElementById(item.id === 'mount' ? 'impact-mount' : `impact-${item.id}`);
+                b.innerText = val.toFixed(1) + "%"; b.style.display = "block"; item.score = val;
+            });
+            rawImpacts.sort((a, b) => a.score - b.score);
+            let weakest = rawImpacts[0].id === "mount" ? document.getElementById('card-mount') : document.getElementById(`card-item-${rawImpacts[0].id}`);
+            weakest.classList.add('weakest-link'); weakest.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            calculate();
+        }
+
+        function updateModeText() { document.getElementById('mode-text').innerText = document.getElementById('impact-mode').checked ? "Real Loss (Loss)" : "Normalized (Pie)"; }
+        function resetBaseline() { const v = calculate(); bDPS = v.dps; bSUS = v.rec; bEHP = v.rawMaxHP; mountBaseline = { dmg: document.getElementById('mount-dmg').value, hp: document.getElementById('mount-hp').value, s1: document.getElementById('mount-sub1').value, v1: document.getElementById('mount-val1').value, s2: document.getElementById('mount-sub2').value, v2: document.getElementById('mount-val2').value }; for (let i = 0; i < 11; i++) { baselineData[i] = { dmg: document.getElementById(`dmg-${i}`).value, hp: document.getElementById(`hp-${i}`).value, s1: document.getElementById(`sub1-${i}`).value, v1: document.getElementById(`val1-${i}`).value, s2: document.getElementById(`sub2-${i}`).value, v2: document.getElementById(`val2-${i}`).value }; } calculate(); alert("Baseline Saved!"); }
+        function restoreMount() { if (!mountBaseline.dmg) return; document.getElementById('mount-dmg').value = mountBaseline.dmg; document.getElementById('mount-hp').value = mountBaseline.hp; document.getElementById('mount-sub1').value = mountBaseline.s1; document.getElementById('mount-val1').value = mountBaseline.v1; document.getElementById('mount-sub2').value = mountBaseline.s2; document.getElementById('mount-val2').value = mountBaseline.v2; calculate(); }
+        function restoreItem(i) { const d = baselineData[i]; if (!d) return; document.getElementById(`dmg-${i}`).value = d.dmg; document.getElementById(`hp-${i}`).value = d.hp; document.getElementById(`sub1-${i}`).value = d.s1; document.getElementById(`val1-${i}`).value = d.v1; document.getElementById(`sub2-${i}`).value = d.s2; document.getElementById(`val2-${i}`).value = d.v2; calculate(); }
+        function showDiff(id, cur, base) { const el = document.getElementById(id); if(!base) { el.textContent = "--"; return; } let d = ((cur - base) / base) * 100; el.textContent = (d >= 0 ? "+" : "") + d.toFixed(2) + "%"; el.className = "text-[9px] font-bold " + (d >= 0 ? "text-green-400" : "text-red-400"); }
+        function renderStatSummary(totals) { const list = document.getElementById('stat-list'); list.innerHTML = ''; let has = false; stats.forEach(s => { if (totals[s] > 0) { has = true; let c = ((s === "Crit Chance" || s === "Double Chance") && totals[s] > 100) ? "text-red-400 underline" : "text-white"; list.innerHTML += `<div class="stat-row"><span>${s}</span><span class="font-bold ${c}">${totals[s].toFixed(1)}%</span></div>`; } }); document.getElementById('stat-summary').classList.toggle('hidden', !has); }
+        function saveToStorage() { const data = {}; document.querySelectorAll('input, select').forEach(el => data[el.id] = el.value); localStorage.setItem('fm_v52', JSON.stringify(data)); alert("Saved to Browser!"); }
+        function loadFromStorage() { const s = localStorage.getItem('fm_v52'); if (s) { try { const d = JSON.parse(s); Object.keys(d).forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = d[id]; }); calculate(); } catch(e) {} } }
+        function exportBuild() { const data = {}; document.querySelectorAll('input, select').forEach(el => data[el.id] = el.value); prompt("Copy Code:", btoa(JSON.stringify(data))); }
+        function importBuild() { const c = prompt("Paste Code:"); if(!c) return; try { const d = JSON.parse(atob(c)); Object.keys(d).forEach(id => { if(document.getElementById(id)) document.getElementById(id).value = d[id]; }); calculate(); } catch(e) { alert("Invalid Code"); } }
+        function toggleGuide() { document.getElementById('guide-modal').classList.toggle('active'); document.getElementById('modal-overlay').classList.toggle('active'); }
+        function scrollToTop() { window.scrollTo({top: 0, behavior: 'smooth'}); }
+        window.onscroll = () => { document.getElementById("back-to-top").style.display = window.scrollY > 300 ? "block" : "none"; };
+        window.onload = init;
+    </script>
+</body>
+</html>
